@@ -12,10 +12,7 @@ from . import maze
 class BaseMap:
     EMPTY = 0  # hardcoded zero id
 
-    def __init__(self, n_row, n_col, *, random=None):
-        self.random_ = random or Random()
-        assert isinstance(self.random_, Random)
-
+    def __init__(self, n_row, n_col):
         self.map = np.full((n_row, n_col), self.EMPTY, dtype=int)
 
     @property
@@ -64,7 +61,11 @@ class MazeMap(BaseMap):
     WALL = -1
 
     def __init__(self, n_row, n_col, *, random=None):
-        super().__init__(1 + 2 * n_row, 1 + 2 * n_col, random=random)
+        super().__init__(1 + 2 * n_row, 1 + 2 * n_col)
+
+        self.random_ = random or Random()
+        assert isinstance(self.random_, Random)
+
         walls = maze.generate(n_row, n_col, random=self.random_)
         self.map[walls] = self.WALL
 
@@ -94,6 +95,10 @@ class RandomDiscoMaze(Env):
         self.COLORS = ((0., 0., 0.), (1., 1., 1.), (0.3, 0.3, 1.0), *extra)
 
         self.n_row, self.n_col, self.n_targets = n_row, n_col, n_targets
+
+        # cache the pixels so that consecutive calls to `.render` with
+        #  `mode` other than `state_pixels` yield the same result.
+        self._state = None
         self.reset()
 
         # actions are the cardinal directions
@@ -102,6 +107,10 @@ class RandomDiscoMaze(Env):
         # the observation space is state `pixels'
         self.observation_space = Box(
             low=0., high=1., dtype=float, shape=(*self.maze.shape, 3))
+
+    @property
+    def state(self):
+        return self._state.copy()
 
     def spawn(self, n=1):
         # generate positions
@@ -126,29 +135,31 @@ class RandomDiscoMaze(Env):
         self.targets = set()
         self.spawn(self.n_targets)
 
-        return self.update()
+        self._state = self.update()
+        return self._state
 
-    def update(self):
+    def update(self, *, maze=None):
+        maze = maze or self.maze
+        assert isinstance(maze, BaseMap)
+
         # pick random colors and paint walls with them
-        colors = self.random_.choices(self.COLORS[3:], k=self.maze.size)
-        self.state = pix = np.array(colors).reshape(*self.maze.shape, 3)
+        colors = self.random_.choices(self.COLORS[3:], k=maze.size)
+        pix = np.array(colors).reshape(*maze.shape, 3)
 
         # assign proper colors to empty space, the player and the targets
-        n_row, n_col = self.maze.shape
+        n_row, n_col = maze.shape
         for i in range(n_row):
             for j in range(n_col):
-                if self.maze[i, j] == MazeMap.EMPTY:
+                if maze[i, j] == MazeMap.EMPTY:
                     pix[i, j] = self.COLORS[0]
 
-                elif self.maze[i, j] == self.PLAYER:
+                elif maze[i, j] == self.PLAYER:
                     pix[i, j] = self.COLORS[1]
 
-                elif self.maze[i, j] in self.targets:
+                elif maze[i, j] in self.targets:
                     pix[i, j] = self.COLORS[2]
 
-        # cache the pixels so that consecutive calls to `.render` with
-        #  `mode` other than `state_pixels` yield the same result.
-        return self.state
+        return pix
 
     def _move(self, oid, dir):
         i, j = self.objects[oid]
@@ -181,7 +192,8 @@ class RandomDiscoMaze(Env):
         any_targets = bool(self.targets) or (self.n_targets == 0)
         is_terminal = (dest_id == MazeMap.WALL) or not any_targets
 
-        return self.update(), reward, is_terminal, {}
+        self._state = self.update()
+        return self._state, reward, is_terminal, {}
 
     def render(self, mode='state_pixels'):
         assert mode in self.metadata['render.modes']
@@ -193,7 +205,7 @@ class RandomDiscoMaze(Env):
             from .render import Renderer
             self._viewer = Renderer(*self.maze.shape, pixel=(10, 10))
 
-        return self._viewer.render(self.state, mode)
+        return self._viewer.render(self._state, mode)
 
     def seed(self, seed=None):
         if seed is None:
