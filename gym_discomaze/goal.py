@@ -10,11 +10,14 @@ class RandomDiscoGoal(GoalEnv):
 
         self.env = RandomDiscoMaze(n_row, n_col, n_targets=0,
                                    n_colors=n_colors, random=random)
+
+        self.action_space = self.env.action_space
         self.observation_space = spaces.Dict(dict.fromkeys([
             'observation',
             'achieved_goal',
             'desired_goal',
         ], self.env.observation_space))
+
         self.reset()
 
     def seed(self, seed):
@@ -34,6 +37,15 @@ class RandomDiscoGoal(GoalEnv):
     @property
     def viewer(self):
         return self.env.viewer
+
+    def compute_reward(self, achieved_goal, desired_goal, _info=None):
+        # the player is guaranteed to have a color distinct fomr the walls
+        achieved_goal = np.all(achieved_goal == self.env.COLORS[1], axis=-1)
+        desired_goal = np.all(desired_goal == self.env.COLORS[1], axis=-1)
+
+        # Deceptive reward: it is nonnegative only when the goal is achieved
+        mask = ~(achieved_goal & desired_goal).any(axis=(-1, -2))
+        return -mask.astype(np.float32)
 
     def reset(self):
         self.env.reset()
