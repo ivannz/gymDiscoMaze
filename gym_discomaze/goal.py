@@ -31,6 +31,10 @@ class RandomDiscoGoal(GoalEnv):
     def player(self):
         return self.env.objects[self.env.PLAYER]
 
+    @property
+    def viewer(self):
+        return self.env.viewer
+
     def reset(self):
         self.env.reset()
 
