@@ -8,8 +8,15 @@ from gym.envs.classic_control.rendering import Viewer as _Viewer
 class Viewer(_Viewer):
     """Allow default closing sequence"""
     def window_closed_by_user(self):
-        type(self.window).on_close(self.window)
+        # call gym's viewer's overriding handler
         super().window_closed_by_user()
+
+        # if pyglet.app.event_loop is being used, the default `on_close` is
+        #  also call `.close()` on the window, closing the it immediately.
+        type(self.window).on_close(self.window)
+
+        # ... however, when there is no event loop, the window lingers, so
+        #  we close it once more (has no effect is it has already been closed).
         self.window.close()
 
 
@@ -32,9 +39,7 @@ class FilledQuadArray:
 
 class Renderer:
     def __init__(self, n_row, n_col, *, pixel=(1, 1)):
-        h, w = pixel
-        self.viewer = Viewer(n_col * w, n_row * h)
-        self.viewer.set_bounds(0, n_col, 0, n_row)
+        self.n_row, self.n_col, self.pixel = n_row, n_col, pixel
 
         # pyglet uses lower left as the origin, while we use upper left
         self._quads = []  # create quads in numpy's order
@@ -47,11 +52,24 @@ class Renderer:
                     j+1, n_row-(i+0),  # ul
                 ))
 
+        self.open()
+
     def render(self, pixels, mode='human'):
         self.viewer.add_onetime(
             FilledQuadArray(self._quads, pixels.reshape(-1, 3)))
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
+    def open(self):
+        assert not self.is_open
+
+        h, w = self.pixel
+        self.viewer = Viewer(self.n_col * w, self.n_row * h)
+        self.viewer.set_bounds(0, self.n_col, 0, self.n_row)
+
     def close(self):
         self.viewer.close()
         del self.viewer
+
+    @property
+    def is_open(self):
+        return hasattr(self, 'viewer')
