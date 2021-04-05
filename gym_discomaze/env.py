@@ -239,10 +239,10 @@ class RandomDiscoMaze(Env):
             reward = 1.
 
         # check termination conditions: maze hazards, or no targets left
-        any_targets = bool(self.targets) or (self.n_targets == 0)
-        is_terminal = (dest_id == MazeMap.WALL) or not any_targets
-
         self.is_alive = (dest_id != MazeMap.WALL) and self.is_alive
+        any_targets = bool(self.targets) or (self.n_targets == 0)
+
+        is_terminal = not any_targets or not self.is_alive
 
         self._state = self.update()
         return self.observation(), reward, is_terminal, {}
