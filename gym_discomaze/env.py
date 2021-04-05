@@ -222,8 +222,10 @@ class RandomDiscoMaze(Env):
 
     @property
     def viewer(self):
+        # bypass for compatibility with certain scripts in gym
         if not hasattr(self, '_viewer'):
             return None
+
         return self._viewer.viewer
 
     def close(self):
