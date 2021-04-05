@@ -24,14 +24,16 @@ class FilledQuadArray:
     """Pixel array using pyglet's streamlined array drawing."""
 
     def __init__(self, quads, colors):
+        # assume float dtype of colors and qauds
         self.quads, self.colors = quads, colors
+        self.kind = 'c4f' if colors.shape[-1] == 4 else 'c3f'
 
     def render(self):
         # `quads` is a flattened array of shape `(n_quads, 4, 2)`
-        # `colors` is an array of shape `(n_quads, 3)`
+        # `colors` is an array of shape `(n_quads, [3 or 4])`
         vl = vertex_list(
             len(self.quads) // 2, ('v2f', self.quads),
-            ('c3f', list(np.tile(self.colors, (1, 4)).flat))
+            (self.kind, list(np.tile(self.colors, (1, 4)).flat))
         )
         vl.draw(GL_QUADS)
         vl.delete()
@@ -56,7 +58,7 @@ class Renderer:
 
     def render(self, pixels, mode='human'):
         self.viewer.add_onetime(
-            FilledQuadArray(self._quads, pixels.reshape(-1, 3)))
+            FilledQuadArray(self._quads, pixels.reshape(-1, pixels.shape[-1])))
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
     def open(self):
