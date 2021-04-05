@@ -109,7 +109,10 @@ class RandomDiscoMaze(Env):
         self.action_space = Discrete(4)
 
         # the observation space is state `pixels'
-        shape = self.maze.shape if self.field is None else self.field
+        shape = self.maze.shape
+        if self.field is not None:
+            # the field of view is centered around the player
+            shape = 1 + 2 * self.field[0], 1 + 2 * self.field[1]
         self.observation_space = Box(
             low=0., high=1., dtype=float, shape=(*shape, 3))
 
