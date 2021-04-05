@@ -87,6 +87,9 @@ def rollout(env):
         if rew != 0:
             print("reward %0.3f" % rew)
 
+        if is_terminal:  # pause on termination
+            human_sets_pause = True
+
         total_reward += rew
         while True:
             if not env.render(mode='human'):
