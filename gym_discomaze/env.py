@@ -126,12 +126,24 @@ class RandomDiscoMaze(Env):
             return self.state
 
         i, j = self.objects[by]
-        r, c = self.field
+        # intersect `field` centered at (i, j) with the full state
+        n_field_rows, n_field_cols = self.field
+        field = np.full((1 + 2 * n_field_rows, 1 + 2 * n_field_cols, 3),
+                        0.5, dtype=self._state.dtype)
 
-        # replicate the border if out of bounds
-        #  XXX copies the objects's color if it is at the edge of the maze
-        strip = np.take(self._state, np.r_[i-r:i+r+1], axis=0, mode='clip')
-        return np.take(strip, np.r_[j-c:j+c+1], axis=1, mode='clip')
+        # compute the intersection of two rectangles
+        n_row, n_col, _ = self._state.shape
+        i0, i1 = max(i - n_field_rows, 0), min(i + n_field_rows + 1, n_row)
+        j0, j1 = max(j - n_field_cols, 0), min(j + n_field_cols + 1, n_col)
+
+        # copy state's slice into the field's
+        np.copyto(
+            field[i0 - (i - n_field_rows):i1 - (i - n_field_rows),
+                  j0 - (j - n_field_cols):j1 - (j - n_field_cols)],
+            self._state[i0:max(i1, 0), j0:max(j1, 0)]  # do not wrap-around
+        )
+
+        return field
 
     def observation_mask(self, *, by=PLAYER):
         """Get a binary mask of the observed pixels by the specified object."""
