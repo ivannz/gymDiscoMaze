@@ -24,11 +24,15 @@ parser.add_argument(
     help='the number of colours in the palette to randomly paint the walls.')
 
 parser.add_argument(
+    '--partial', required=False, dest='partial', action='store_true',
+    help='Limit the observable field to 5x5.')
+
+parser.add_argument(
     '--seed', required=False, default=None,
     help='PRNG seed to use.')
 
-parser.set_defaults(n_row=15, n_col=15, n_colors=5,
-                    n_targets=5, seed=None)
+parser.set_defaults(n_row=15, n_col=15, n_colors=5, n_targets=5,
+                    partial=False, seed=None)
 
 args, _ = parser.parse_known_args()
 print(vars(args))
@@ -62,7 +66,8 @@ def key_release(key, mod):
 
 env = RandomDiscoMaze(args.n_row, args.n_col,
                       n_targets=args.n_targets,
-                      n_colors=args.n_colors)
+                      n_colors=args.n_colors,
+                      field=(2, 2) if args.partial else None)
 env.seed(args.seed)
 
 env.render(mode='human')
