@@ -1,6 +1,37 @@
 import time
+import argparse
 
 from . import RandomDiscoMaze
+
+parser = argparse.ArgumentParser(
+    description='Play the Random Disco Maze.',
+    add_help=True)
+
+parser.add_argument(
+    '--n_row', type=int, required=False, default=15,
+    help='the number of rows in the maze.')
+
+parser.add_argument(
+    '--n_col', type=int, required=False, default=15,
+    help='the number of columns in the maze.')
+
+parser.add_argument(
+    '--n_colors', type=int, required=False, default=5,
+    help='the number of colours in the palette to randomly paint the walls.')
+
+parser.add_argument(
+    '--n_targets', type=int, required=False, default=1,
+    help='the number of colours in the palette to randomly paint the walls.')
+
+parser.add_argument(
+    '--seed', required=False, default=None,
+    help='PRNG seed to use.')
+
+parser.set_defaults(n_row=15, n_col=15, n_colors=5,
+                    n_targets=5, seed=None)
+
+args, _ = parser.parse_known_args()
+print(vars(args))
 
 KEYMAP = dict(zip(map(ord, 'asdw'), range(4)))
 
@@ -29,8 +60,10 @@ def key_release(key, mod):
             human_agent_action = None
 
 
-env = RandomDiscoMaze(15, 15, n_targets=1, n_colors=5)
-
+env = RandomDiscoMaze(args.n_row, args.n_col,
+                      n_targets=args.n_targets,
+                      n_colors=args.n_colors)
+env.seed(args.seed)
 
 env.render(mode='human')
 env.unwrapped.viewer.window.on_key_press = key_press
