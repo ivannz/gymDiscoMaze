@@ -85,8 +85,12 @@ class RandomDiscoMaze(Env):
         'render.modes': {'human', 'rgb_array', 'state_pixels'},
     }
 
-    def __init__(self, n_row=10, n_col=10, *, n_colors=5, n_targets=1, random=None):
+    def __init__(self, n_row=10, n_col=10, *, n_colors=5, n_targets=1,
+                 field=None, random=None):
         # super().__init__()
+        assert field is None or isinstance(field, tuple)
+        self.field = field
+
         self.random_ = random or Random()
         assert isinstance(self.random_, Random)
 
@@ -105,12 +109,39 @@ class RandomDiscoMaze(Env):
         self.action_space = Discrete(4)
 
         # the observation space is state `pixels'
+        shape = self.maze.shape if self.field is None else self.field
         self.observation_space = Box(
-            low=0., high=1., dtype=float, shape=(*self.maze.shape, 3))
+            low=0., high=1., dtype=float, shape=(*shape, 3))
 
     @property
     def state(self):
         return self._state.copy()
+
+    def observation(self, *, by=PLAYER):
+        """Get the pixels observed from the object's vantage point."""
+        if self.field is None:
+            return self.state
+
+        i, j = self.objects[by]
+        r, c = self.field
+
+        # replicate the border if out of bounds
+        #  XXX copies the objects's color if it is at the edge of the maze
+        strip = np.take(self._state, np.r_[i-r:i+r+1], axis=0, mode='clip')
+        return np.take(strip, np.r_[j-c:j+c+1], axis=1, mode='clip')
+
+    def observation_mask(self, *, by=PLAYER):
+        """Get a binary mask of the observed pixels by the specified object."""
+        if self.field is None:
+            return np.ones_like(self._state[..., :1])
+
+        i, j = self.objects[by]
+        r, c = self.field
+
+        # clip potentially negative indices to zero
+        mask = np.zeros_like(self._state[..., :1])
+        mask[max(i-r, 0):i+r+1, max(j-c, 0):j+c+1] = 1.
+        return mask
 
     def spawn(self, n=1):
         # generate positions
@@ -137,7 +168,7 @@ class RandomDiscoMaze(Env):
         self.spawn(self.n_targets)
 
         self._state = self.update()
-        return self._state
+        return self.observation()
 
     def update(self, *, maze=None):
         maze = maze or self.maze
@@ -199,19 +230,22 @@ class RandomDiscoMaze(Env):
         self.is_alive = (dest_id != MazeMap.WALL) and self.is_alive
 
         self._state = self.update()
-        return self._state, reward, is_terminal, {}
+        return self.observation(), reward, is_terminal, {}
 
     def render(self, mode='state_pixels'):
         assert mode in self.metadata['render.modes']
         if mode == 'state_pixels':
-            return self.state
+            return self.state  # return full state
 
         # other rendering
         if not hasattr(self, '_viewer'):
             from .render import Renderer
             self._viewer = Renderer(*self.maze.shape, pixel=(10, 10))
 
-        return self._viewer.render(self._state, mode)
+        # append observability mask as alpha w. value 0.25
+        mask = np.where(self.observation_mask() == 0, 0.25, 1.)
+        masked_state = np.concatenate([self._state, mask], axis=-1)
+        return self._viewer.render(masked_state, mode)
 
     def seed(self, seed=None):
         if seed is None:
