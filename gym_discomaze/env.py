@@ -130,6 +130,7 @@ class RandomDiscoMaze(Env):
         i, j = self.random_.choice(self.maze.coordinates_of(MazeMap.EMPTY))
         self.maze[i, j] = self.PLAYER
         self.objects = [None, (i, j)]
+        self.is_alive = True
 
         # ... and the targets
         self.targets = set()
@@ -171,6 +172,9 @@ class RandomDiscoMaze(Env):
         if dest_id in self.targets:
             del self.maze[u, v]  # consume the target
 
+        if dest_id == MazeMap.WALL:
+            del self.maze[u, v]  # displace the wall
+
         if self.maze.relocate((i, j), (u, v)) == MazeMap.EMPTY:
             self.objects[oid] = u, v  # update the position
 
@@ -178,7 +182,7 @@ class RandomDiscoMaze(Env):
 
     def step(self, action):
         dest_id = MazeMap.EMPTY
-        if action is not None:
+        if action is not None and self.is_alive:
             dest_id = self._move(self.PLAYER, self.DIRECTION[action])
 
         # check winning conditions
@@ -191,6 +195,8 @@ class RandomDiscoMaze(Env):
         # check termination conditions: maze hazards, or no targets left
         any_targets = bool(self.targets) or (self.n_targets == 0)
         is_terminal = (dest_id == MazeMap.WALL) or not any_targets
+
+        self.is_alive = (dest_id != MazeMap.WALL) and self.is_alive
 
         self._state = self.update()
         return self._state, reward, is_terminal, {}
