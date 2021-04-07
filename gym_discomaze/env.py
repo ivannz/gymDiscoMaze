@@ -95,8 +95,9 @@ class RandomDiscoMaze(Env):
         assert isinstance(self.random_, Random)
 
         from matplotlib.cm import hot
-        *extra, = map(tuple, hot(np.linspace(0.2, 0.8, num=n_colors))[:, :-1])
-        self.COLORS = ((0., 0., 0.), (1., 1., 1.), (0.3, 0.3, 1.0), *extra)
+        colors = hot(np.linspace(0.2, 0.8, num=n_colors), bytes=False)
+        self.COLORS = ((0., 0., 0.), (1., 1., 1.), (0.3, 0.3, 1.0),
+                       *map(tuple, colors[:, :-1]))  # remove alpha
 
         self.n_row, self.n_col, self.n_targets = n_row, n_col, n_targets
 
@@ -114,7 +115,7 @@ class RandomDiscoMaze(Env):
             # the field of view is centered around the player
             shape = 1 + 2 * self.field[0], 1 + 2 * self.field[1]
         self.observation_space = Box(
-            low=0., high=1., dtype=float, shape=(*shape, 3))
+            low=0., high=1., dtype=colors.dtype, shape=(*shape, 3))
 
     @property
     def state(self):

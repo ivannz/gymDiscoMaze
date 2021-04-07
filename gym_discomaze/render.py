@@ -24,16 +24,22 @@ class FilledQuadArray:
     """Pixel array using pyglet's streamlined array drawing."""
 
     def __init__(self, quads, colors):
-        # assume float dtype of colors and qauds
+        # assume float dtype of quads, colors' dtype is inferred
         self.quads, self.colors = quads, colors
-        self.kind = 'c4f' if colors.shape[-1] == 4 else 'c3f'
+
+        # infer the color format string: c[34][Bf]
+        self.kind = f'c{colors.shape[-1]}{colors.dtype.char}'
 
     def render(self):
         # `quads` is a flattened array of shape `(n_quads, 4, 2)`
         # `colors` is an array of shape `(n_quads, [3 or 4])`
+        # XXX this could be optimized if we create a static vertex buffer in
+        #  the `__init__` with a color stream, and update the latter before
+        #  every `.render()`.
+        #  https://pyglet.readthedocs.io/en/latest/programming_guide/graphics.html#data-usage
         vl = vertex_list(
             len(self.quads) // 2, ('v2f', self.quads),
-            (self.kind, list(np.tile(self.colors, (1, 4)).flat))
+            (self.kind, tuple(np.tile(self.colors, (1, 4)).flat))
         )
         vl.draw(GL_QUADS)
         vl.delete()
