@@ -103,7 +103,7 @@ class RandomDiscoMaze(Env):
 
         # cache the pixels so that consecutive calls to `.render` with
         #  `mode` other than `state_pixels` yield the same result.
-        self._state = None
+        self.state = None
         self.reset()
 
         # actions are the cardinal directions
@@ -117,10 +117,6 @@ class RandomDiscoMaze(Env):
         self.observation_space = Box(
             low=0, high=255, dtype=np.uint8, shape=(*shape, 3))
 
-    @property
-    def state(self):
-        return self._state.copy()
-
     def observation(self, *, by=PLAYER):
         """Get the pixels observed from the object's vantage point."""
         if self.field is None:
@@ -130,10 +126,10 @@ class RandomDiscoMaze(Env):
         # intersect `field` centered at (i, j) with the full state
         n_field_rows, n_field_cols = self.field
         field = np.full((1 + 2 * n_field_rows, 1 + 2 * n_field_cols, 3),
-                        self.COLORS[0], dtype=self._state.dtype)
+                        self.COLORS[0], dtype=self.state.dtype)
 
         # compute the intersection of two rectangles
-        n_row, n_col, _ = self._state.shape
+        n_row, n_col, _ = self.state.shape
         i0, i1 = max(i - n_field_rows, 0), min(i + n_field_rows + 1, n_row)
         j0, j1 = max(j - n_field_cols, 0), min(j + n_field_cols + 1, n_col)
 
@@ -141,7 +137,7 @@ class RandomDiscoMaze(Env):
         np.copyto(
             field[i0 - (i - n_field_rows):i1 - (i - n_field_rows),
                   j0 - (j - n_field_cols):j1 - (j - n_field_cols)],
-            self._state[i0:max(i1, 0), j0:max(j1, 0)]  # do not wrap-around
+            self.state[i0:max(i1, 0), j0:max(j1, 0)]  # do not wrap-around
         )
 
         return field
@@ -149,13 +145,13 @@ class RandomDiscoMaze(Env):
     def observation_mask(self, *, by=PLAYER):
         """Get a binary mask of the observed pixels by the specified object."""
         if self.field is None:
-            return np.ones_like(self._state[..., :1], dtype=bool)
+            return np.ones_like(self.state[..., :1], dtype=bool)
 
         i, j = self.objects[by]
         r, c = self.field
 
         # clip potentially negative indices to zero
-        mask = np.zeros_like(self._state[..., :1], dtype=bool)
+        mask = np.zeros_like(self.state[..., :1], dtype=bool)
         mask[max(i-r, 0):i+r+1, max(j-c, 0):j+c+1] = True
         return mask
 
@@ -183,7 +179,7 @@ class RandomDiscoMaze(Env):
         self.targets = set()
         self.spawn(self.n_targets)
 
-        self._state = self.update()
+        self.state = self.update()
         return self.observation()
 
     def update(self, *, maze=None):
@@ -245,7 +241,7 @@ class RandomDiscoMaze(Env):
 
         is_terminal = not any_targets or not self.is_alive
 
-        self._state = self.update()
+        self.state = self.update()
         return self.observation(), reward, is_terminal, {}
 
     def render(self, mode='state_pixels'):
@@ -260,7 +256,7 @@ class RandomDiscoMaze(Env):
 
         # append observability mask as alpha w. value 0.25
         mask = np.where(self.observation_mask(), np.uint8(255), np.uint8(63))
-        masked_state = np.concatenate([self._state, mask], axis=-1)
+        masked_state = np.concatenate([self.state, mask], axis=-1)
         return self._viewer.render(masked_state, mode)
 
     def seed(self, seed=None):
