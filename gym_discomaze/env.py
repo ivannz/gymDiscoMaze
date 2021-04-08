@@ -95,9 +95,9 @@ class RandomDiscoMaze(Env):
         assert isinstance(self.random_, Random)
 
         from matplotlib.cm import hot
-        colors = hot(np.linspace(0.2, 0.8, num=n_colors), bytes=False)
-        self.COLORS = ((0., 0., 0.), (1., 1., 1.), (0.3, 0.3, 1.0),
-                       *map(tuple, colors[:, :-1]))  # remove alpha
+        colors = hot(np.linspace(0.2, 0.8, num=n_colors), bytes=True)
+        self.COLORS = [(0, 0, 0), (255, 255, 255), (77, 77, 255),
+                       *map(tuple, colors[:, :-1])]  # remove alpha
 
         self.n_row, self.n_col, self.n_targets = n_row, n_col, n_targets
 
@@ -115,7 +115,7 @@ class RandomDiscoMaze(Env):
             # the field of view is centered around the player
             shape = 1 + 2 * self.field[0], 1 + 2 * self.field[1]
         self.observation_space = Box(
-            low=0., high=1., dtype=colors.dtype, shape=(*shape, 3))
+            low=0, high=255, dtype=np.uint8, shape=(*shape, 3))
 
     @property
     def state(self):
@@ -130,7 +130,7 @@ class RandomDiscoMaze(Env):
         # intersect `field` centered at (i, j) with the full state
         n_field_rows, n_field_cols = self.field
         field = np.full((1 + 2 * n_field_rows, 1 + 2 * n_field_cols, 3),
-                        0.5, dtype=self._state.dtype)
+                        self.COLORS[0], dtype=self._state.dtype)
 
         # compute the intersection of two rectangles
         n_row, n_col, _ = self._state.shape
@@ -149,14 +149,14 @@ class RandomDiscoMaze(Env):
     def observation_mask(self, *, by=PLAYER):
         """Get a binary mask of the observed pixels by the specified object."""
         if self.field is None:
-            return np.ones_like(self._state[..., :1])
+            return np.ones_like(self._state[..., :1], dtype=bool)
 
         i, j = self.objects[by]
         r, c = self.field
 
         # clip potentially negative indices to zero
-        mask = np.zeros_like(self._state[..., :1])
-        mask[max(i-r, 0):i+r+1, max(j-c, 0):j+c+1] = 1.
+        mask = np.zeros_like(self._state[..., :1], dtype=bool)
+        mask[max(i-r, 0):i+r+1, max(j-c, 0):j+c+1] = True
         return mask
 
     def spawn(self, n=1):
@@ -259,7 +259,7 @@ class RandomDiscoMaze(Env):
             self._viewer = Renderer(*self.maze.shape, pixel=(10, 10))
 
         # append observability mask as alpha w. value 0.25
-        mask = np.where(self.observation_mask() == 0, 0.25, 1.)
+        mask = np.where(self.observation_mask(), np.uint8(255), np.uint8(63))
         masked_state = np.concatenate([self._state, mask], axis=-1)
         return self._viewer.render(masked_state, mode)
 
