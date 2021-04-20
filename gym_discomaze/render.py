@@ -15,7 +15,7 @@ class SimpleImageViewer(Window):
         if isinstance(scale, (int, float)):
             scale = scale, scale
         assert all(isinstance(p, (int, float)) and p > 0 for p in scale)
-        self._scale = self.scale = scale
+        self._init_scale = self.scale = scale
 
         super().__init__(caption=caption, resizable=False,
                          vsync=vsync, display=Display(display))
@@ -42,8 +42,9 @@ class SimpleImageViewer(Window):
         self.close()
 
     def on_key_press(self, symbol, modifiers):
-        if symbol not in (key.PLUS, key.MINUS, key.EQUAL, key._0) \
-           or not hasattr(self, 'texture'):
+        if not hasattr(self, 'texture') or symbol not in {
+            key.PLUS, key.MINUS, key.EQUAL, key.UNDERSCORE, key._0
+        }:
             return super().on_key_press(symbol, modifiers)
 
         # zoom in on plus
@@ -51,12 +52,12 @@ class SimpleImageViewer(Window):
             self.scale = self.scale[0] + 1, self.scale[1] + 1
 
         # zoom in out on minus
-        elif symbol == key.MINUS:
+        elif symbol in (key.MINUS, key.UNDERSCORE):
             self.scale = max(1, self.scale[0] - 1), max(1, self.scale[1] - 1)
 
         # reset zoom on numeric zero
         elif symbol == key._0:
-            self.scale = self._scale
+            self.scale = self._init_scale
 
         sw, sh = self.scale
         self.set_size(self.texture.width * sw, self.texture.height * sh)
