@@ -1,6 +1,8 @@
 import time
 import argparse
 
+from pyglet.window import key
+
 from . import RandomDiscoMaze
 
 parser = argparse.ArgumentParser(
@@ -37,31 +39,36 @@ parser.set_defaults(n_row=15, n_col=15, n_colors=5, n_targets=5,
 args, _ = parser.parse_known_args()
 print(vars(args))
 
-KEYMAP = dict(zip(map(ord, 'asdw'), range(4)))
+KEYMAP = dict(zip([key.A, key.S, key.D, key.W], range(4)))
+
 
 human_agent_action = None
 human_wants_restart = False
 human_sets_pause = False
 
 
-def key_press(key, mod):
+def on_key_press(symbol, modifiers):
     global human_agent_action, human_wants_restart, human_sets_pause
-    if key == 0xFF1B:
+    if symbol == key.ENTER:
         human_wants_restart = True
+        return
 
-    if key == 32:
+    if symbol == key.SPACE:
         human_sets_pause = not human_sets_pause
+        return
 
-    if key in KEYMAP:
-        human_agent_action = KEYMAP[key]
+    if symbol in KEYMAP:
+        human_agent_action = KEYMAP[symbol]
+        return
 
 
-def key_release(key, mod):
+def on_key_release(symbol, modifiers):
     global human_agent_action
 
-    if key in KEYMAP:
-        if human_agent_action == KEYMAP[key]:
+    if symbol in KEYMAP:
+        if human_agent_action == KEYMAP[symbol]:
             human_agent_action = None
+        return
 
 
 env = RandomDiscoMaze(args.n_row, args.n_col,
@@ -71,8 +78,7 @@ env = RandomDiscoMaze(args.n_row, args.n_col,
 env.seed(args.seed)
 
 env.render(mode='human')
-env.unwrapped.viewer.window.on_key_press = key_press
-env.unwrapped.viewer.window.on_key_release = key_release
+env.unwrapped.viewer.window.push_handlers(on_key_press, on_key_release)
 
 
 def rollout(env):
