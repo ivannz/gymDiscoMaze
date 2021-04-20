@@ -1,83 +1,105 @@
+import sys
 import numpy as np
 
-from pyglet.gl import GL_QUADS
-from pyglet.graphics import vertex_list
-from gym.envs.classic_control.rendering import Viewer as _Viewer
+from pyglet import gl
+from pyglet.image import ImageData
+from pyglet.window import Window, key
+from pyglet.canvas import Display
+
+from random import randint
 
 
-class Viewer(_Viewer):
-    """Allow default closing sequence"""
-    def window_closed_by_user(self):
-        # call gym's viewer's overriding handler
-        super().window_closed_by_user()
+class SimpleImageViewer(Window):
+    def __init__(self, caption=None, *, scale=None, display=None, vsync=False):
+        scale = scale or (1, 1)
+        if isinstance(scale, (int, float)):
+            scale = scale, scale
+        assert all(isinstance(p, (int, float)) and p > 0 for p in scale)
+        self._scale = self.scale = scale
 
-        # if pyglet.app.event_loop is being used, the default `on_close` is
-        #  also call `.close()` on the window, closing the it immediately.
-        type(self.window).on_close(self.window)
+        super().__init__(caption=caption, resizable=False,
+                         vsync=vsync, display=Display(display))
 
-        # ... however, when there is no event loop, the window lingers, so
-        #  we close it once more (has no effect is it has already been closed).
-        self.window.close()
-
-
-class FilledQuadArray:
-    """Pixel array using pyglet's streamlined array drawing."""
-
-    def __init__(self, quads, colors):
-        # assume float dtype of quads, colors' dtype is inferred
-        self.quads, self.colors = quads, colors
-
-        # infer the color format string: c[34][Bf]
-        self.kind = f'c{colors.shape[-1]}{colors.dtype.char}'
-
-    def render(self):
-        # `quads` is a flattened array of shape `(n_quads, 4, 2)`
-        # `colors` is an array of shape `(n_quads, [3 or 4])`
-        # XXX this could be optimized if we create a static vertex buffer in
-        #  the `__init__` with a color stream, and update the latter before
-        #  every `.render()`.
-        #  https://pyglet.readthedocs.io/en/latest/programming_guide/graphics.html#data-usage
-        vl = vertex_list(
-            len(self.quads) // 2, ('v2f', self.quads),
-            (self.kind, tuple(np.tile(self.colors, (1, 4)).flat))
-        )
-        vl.draw(GL_QUADS)
-        vl.delete()
-
-
-class Renderer:
-    def __init__(self, n_row, n_col, *, pixel=(1, 1)):
-        self.n_row, self.n_col, self.pixel = n_row, n_col, pixel
-
-        # pyglet uses lower left as the origin, while we use upper left
-        self._quads = []  # create quads in numpy's order
-        for i in range(n_row):
-            for j in range(n_col):
-                self._quads.extend((
-                    j+0, n_row-(i+0),  # ur
-                    j+0, n_row-(i+1),  # lr
-                    j+1, n_row-(i+1),  # ll
-                    j+1, n_row-(i+0),  # ul
-                ))
-
-        self.open()
-
-    def render(self, pixels, mode='human'):
-        self.viewer.add_onetime(
-            FilledQuadArray(self._quads, pixels.reshape(-1, pixels.shape[-1])))
-        return self.viewer.render(return_rgb_array=mode == 'rgb_array')
-
-    def open(self):
-        assert not self.is_open
-
-        h, w = self.pixel
-        self.viewer = Viewer(self.n_col * w, self.n_row * h)
-        self.viewer.set_bounds(0, self.n_col, 0, self.n_row)
-
-    def close(self):
-        self.viewer.close()
-        del self.viewer
+        # randomly displace the window
+        pos_y = randint(0, max(self.screen.height - self.height, 0))
+        pos_x = randint(0, max(self.screen.width - self.width, 0))
+        self.set_location(self.screen.x + pos_x, self.screen.y + pos_y)
 
     @property
-    def is_open(self):
-        return hasattr(self, 'viewer')
+    def window(self):
+        return self
+
+    @property
+    def isopen(self):
+        return not self._was_closed
+
+    def close(self):
+        if not sys.is_finalizing():
+            super().close()
+
+    def on_close(self):
+        super().on_close()
+        self.close()
+
+    def on_key_press(self, symbol, modifiers):
+        if symbol not in (key.PLUS, key.MINUS, key.EQUAL, key._0) \
+           or not hasattr(self, 'texture'):
+            return super().on_key_press(symbol, modifiers)
+
+        # zoom in on plus
+        if symbol in (key.PLUS, key.EQUAL):
+            self.scale = self.scale[0] + 1, self.scale[1] + 1
+
+        # zoom in out on minus
+        elif symbol == key.MINUS:
+            self.scale = max(1, self.scale[0] - 1), max(1, self.scale[1] - 1)
+
+        # reset zoom on numeric zero
+        elif symbol == key._0:
+            self.scale = self._scale
+
+        sw, sh = self.scale
+        self.set_size(self.texture.width * sw, self.texture.height * sh)
+
+    def on_draw(self):
+        self.clear()
+
+        if hasattr(self, 'texture'):
+            # pixelart-like nearest neighbour magnification
+            gl.glTexParameteri(
+                gl.GL_TEXTURE_2D,
+                gl.GL_TEXTURE_MAG_FILTER,
+                gl.GL_NEAREST
+            )
+
+            # transparent against black bg (by zeroing the factor)
+            gl.glEnable(gl.GL_BLEND)
+            gl.glBlendEquation(gl.GL_FUNC_ADD)
+            gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ZERO)
+
+            # blit onto the buffer resizing to the current window's dims
+            self.texture.blit(0, 0, width=self.width, height=self.height)
+
+    def imshow(self, data):
+        assert data.dtype == np.uint8
+
+        height, width, *channels = data.shape
+        assert len(channels) == 1 and channels[0] in (3, 4)
+        format = 'RGBA' if channels[0] == 4 else 'RGB'
+
+        # switch to our GL context and create the texture
+        self.switch_to()
+        self.texture = ImageData(
+            width, height, format, data.tobytes(),
+            pitch=-width * len(format)).get_texture()
+
+        # resize the window to the array's dims
+        sw, sh = self.scale
+        self.set_size(self.texture.width * sw, self.texture.height * sh)
+
+        # handle os events and redraw
+        self.dispatch_events()
+        self.on_draw()
+        self.flip()
+
+        return self.isopen
