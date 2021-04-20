@@ -82,7 +82,7 @@ class RandomDiscoMaze(Env):
     PLAYER = 1  # hardcoded id of the player
 
     metadata = {
-        'render.modes': {'human', 'rgb_array', 'state_pixels'},
+        'render.modes': {'human', 'state_pixels'},
     }
 
     def __init__(self, n_row=10, n_col=10, *, n_colors=5, n_targets=1,
@@ -247,17 +247,17 @@ class RandomDiscoMaze(Env):
     def render(self, mode='state_pixels'):
         assert mode in self.metadata['render.modes']
         if mode == 'state_pixels':
-            return self.state  # return full state
+            return self.state  # return full/observed state
 
         # other rendering
         if not hasattr(self, '_viewer'):
-            from .render import Renderer
-            self._viewer = Renderer(*self.maze.shape, pixel=(10, 10))
+            from .render import SimpleImageViewer
+            self._viewer = SimpleImageViewer(scale=(5, 5), vsync=True)
 
-        # append observability mask as alpha w. value 0.25
+        # append the observability mask as alpha w. value 0.25
         mask = np.where(self.observation_mask(), np.uint8(255), np.uint8(63))
         masked_state = np.concatenate([self.state, mask], axis=-1)
-        return self._viewer.render(masked_state, mode)
+        return self._viewer.imshow(masked_state)
 
     def seed(self, seed=None):
         if seed is None:
@@ -272,7 +272,7 @@ class RandomDiscoMaze(Env):
         if not hasattr(self, '_viewer'):
             return None
 
-        return self._viewer.viewer
+        return self._viewer
 
     def close(self):
         if hasattr(self, '_viewer'):
