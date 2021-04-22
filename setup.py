@@ -6,7 +6,8 @@ setup(
     version='0.4',
     license='MIT',
     packages=[
-        'gym_discomaze'
+        'gym_discomaze',  # core implementation
+        'gym_discomaze.ext',  # extensions
     ],
     install_requires=[
         'numpy',

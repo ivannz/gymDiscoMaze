@@ -1,7 +1,7 @@
 import numpy as np
 from gym import GoalEnv, spaces
 
-from .env import RandomDiscoMaze, BaseMap
+from ..env import RandomDiscoMaze, BaseMap
 
 
 class RandomDiscoGoal(GoalEnv):
