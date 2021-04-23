@@ -81,6 +81,12 @@ class SimpleImageViewer(Window):
             # blit onto the buffer resizing to the current window's dims
             self.texture.blit(0, 0, width=self.width, height=self.height)
 
+    def set_size(self, width, height):
+        # call on_resize to correctly adjust the gl viewport
+        super().set_size(width, height)
+        if not self.resizeable:  # tom-eyy-teu, tom-ahh-teu
+            super().on_resize(width, height)  # call parent's method
+
     def imshow(self, data):
         assert data.dtype == np.uint8
 
