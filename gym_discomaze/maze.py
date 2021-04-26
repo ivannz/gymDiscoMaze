@@ -9,13 +9,15 @@ WSEN = W | S | E | N     # mask to isolate a nibble
 
 # convenience structures: direction atals and all directions
 ATLAS = {
+    0: (0, 0, +0, +0),  # bogus, 'stay-in-place', durection
     W: (W, E, +0, -1),
     S: (S, N, +1, +0),
     E: (E, W, +0, +1),
     N: (N, S, -1, +0),
 }
 
-DIRECTIONS = [W, S, E, N]
+DIRECTIONS = [0, W, S, E, N]
+DIR_LABELS = ['stay', 'west', 'south', 'east', 'north']
 
 
 def generate(n_row, n_col, *, random=None):
@@ -60,7 +62,7 @@ def generate(n_row, n_col, *, random=None):
     # DFS build a maze `O(4 * n_row * n_col)`.
     while True:
         # get all walls, removing indestructible borders from candidates
-        neighbours = [d for d in ATLAS if get_walls(i, j, d) == WSEN]
+        neighbours = [d for d in ATLAS if get_walls(i, j, d) == WSEN and d > 0]
         if not neighbours:
             # get the direction to backtrack to
             backtrack = (data[i, j] >> P_BACKTRACK) & WSEN
