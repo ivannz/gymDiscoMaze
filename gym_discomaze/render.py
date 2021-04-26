@@ -88,6 +88,9 @@ class SimpleImageViewer(Window):
             super().on_resize(width, height)  # call parent's method
 
     def imshow(self, data):
+        if not self.isopen:
+            return False
+
         assert data.dtype == np.uint8
 
         height, width, *channels = data.shape
