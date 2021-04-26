@@ -78,7 +78,8 @@ class RandomDiscoMaze(Env):
     Custom implementation of the Random Disco Maze environment from section 4.1
     of [Badia et al. (2020)](https://arxiv.org/abs/2002.06038).
     """
-    DIRECTION = maze.DIRECTIONS[:]
+    directions = maze.DIRECTIONS[:]
+
     PLAYER = 1  # hardcoded id of the player
 
     metadata = {
@@ -107,7 +108,9 @@ class RandomDiscoMaze(Env):
         self.reset()
 
         # actions are the cardinal directions
-        self.action_space = Discrete(4)
+        self.action_space = Discrete(len(self.directions))
+        self.named_actions = dict(zip(maze.DIR_LABELS,
+                                      range(len(self.directions))))
 
         # the observation space is state `pixels'
         shape = self.maze.shape
@@ -209,6 +212,10 @@ class RandomDiscoMaze(Env):
         i, j = self.objects[oid]
 
         _, _, u, v = maze.ATLAS[dir]
+        if u == 0 and v == 0:
+            # displacing self is always successful
+            return MazeMap.EMPTY
+
         u, v = u + i, v + j
 
         dest_id = self.maze[u, v]
@@ -226,7 +233,7 @@ class RandomDiscoMaze(Env):
     def step(self, action):
         dest_id = MazeMap.EMPTY
         if action is not None and self.is_alive:
-            dest_id = self._move(self.PLAYER, self.DIRECTION[action])
+            dest_id = self._move(self.PLAYER, self.directions[action])
 
         # check winning conditions
         reward = 0.
