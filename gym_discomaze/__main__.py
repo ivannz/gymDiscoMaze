@@ -5,6 +5,35 @@ from pyglet.window import key
 
 from . import RandomDiscoMaze
 
+human_agent_action = None
+human_wants_restart = False
+human_sets_pause = False
+
+
+def on_key_press(symbol, modifiers):
+    global human_agent_action, human_wants_restart, human_sets_pause
+    if symbol == key.ENTER:
+        human_wants_restart = True
+        return
+
+    if symbol == key.SPACE:
+        human_sets_pause = not human_sets_pause
+        return
+
+    if symbol in KEYMAP:
+        human_agent_action = symbol
+        return
+
+
+def on_key_release(symbol, modifiers):
+    global human_agent_action
+
+    if symbol in KEYMAP:
+        if human_agent_action == symbol:
+            human_agent_action = None
+        return
+
+
 parser = argparse.ArgumentParser(
     description='Play the Random Disco Maze.',
     add_help=True)
@@ -39,42 +68,16 @@ parser.set_defaults(n_row=15, n_col=15, n_colors=5, n_targets=5,
 args, _ = parser.parse_known_args()
 print(vars(args))
 
-KEYMAP = dict(zip([key.A, key.S, key.D, key.W], range(4)))
-
-
-human_agent_action = None
-human_wants_restart = False
-human_sets_pause = False
-
-
-def on_key_press(symbol, modifiers):
-    global human_agent_action, human_wants_restart, human_sets_pause
-    if symbol == key.ENTER:
-        human_wants_restart = True
-        return
-
-    if symbol == key.SPACE:
-        human_sets_pause = not human_sets_pause
-        return
-
-    if symbol in KEYMAP:
-        human_agent_action = KEYMAP[symbol]
-        return
-
-
-def on_key_release(symbol, modifiers):
-    global human_agent_action
-
-    if symbol in KEYMAP:
-        if human_agent_action == KEYMAP[symbol]:
-            human_agent_action = None
-        return
-
-
 env = RandomDiscoMaze(args.n_row, args.n_col,
                       n_targets=args.n_targets,
                       n_colors=args.n_colors,
                       field=(2, 2) if args.partial else None)
+
+# print key bindings
+KEYMAP = dict(zip([None, key.A, key.S, key.D, key.W],
+                  ['stay', 'west', 'south', 'east', 'north']))
+print({chr(k): n for k, n in KEYMAP.items() if k is not None})
+
 env.seed(args.seed)
 
 env.render(mode='human')
@@ -89,7 +92,8 @@ def rollout(env):
 
     obs = env.reset()
     while not (human_wants_restart or is_terminal):
-        obs, rew, is_terminal, info = env.step(human_agent_action)
+        action = env.named_actions[KEYMAP[human_agent_action]]
+        obs, rew, is_terminal, info = env.step(action)
         if rew != 0:
             print("reward %0.3f" % rew)
 
@@ -98,10 +102,11 @@ def rollout(env):
 
         total_reward += rew
         while True:
+            # call render to process kb and ui events
             if not env.render(mode='human'):
                 return False
 
-            time.sleep(0.05)
+            time.sleep(0.04)
             if not human_sets_pause:
                 break
 
