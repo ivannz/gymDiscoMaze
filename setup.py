@@ -1,4 +1,7 @@
-from setuptools import setup
+from setuptools import setup, Extension
+from Cython.Build import cythonize
+
+from numpy import get_include
 
 setup(
     name='RandomDiscoMaze',
@@ -13,5 +16,19 @@ setup(
         'numpy',
         'gym',
         'pyglet',
-    ]
+    ],
+    ext_modules=cythonize([
+        # perfect maze generator with modern numpy.random API in cython
+        Extension(
+            'gym_discomaze._maze', [
+                'gym_discomaze/_maze.pyx',
+            ], extra_compile_args=[
+                '-O3', '-Ofast',
+            ], include_dirs=[
+                get_include(),
+            ], define_macros=[
+                ('NPY_NO_DEPRECATED_API', 0),
+            ],
+        ),
+    ]),
 )
