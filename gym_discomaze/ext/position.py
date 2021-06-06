@@ -10,8 +10,8 @@ class RandomDiscoMazeWithPosition(RandomDiscoMaze):
     PLAYER = RandomDiscoMaze.PLAYER
 
     def __init__(self, n_row=10, n_col=10, *, n_colors=5, n_targets=1,
-                 field=None, random=None):
-        super().__init__(n_row, n_col, field=field, random=random,
+                 field=None, generator=None):
+        super().__init__(n_row, n_col, field=field, generator=generator,
                          n_colors=n_colors, n_targets=n_targets)
 
         # position has integer coordinates in a 2d-box

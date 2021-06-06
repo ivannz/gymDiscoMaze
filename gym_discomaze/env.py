@@ -3,7 +3,6 @@ import numpy as np
 from gym import Env
 from gym.spaces import Discrete, Box
 
-from random import Random
 from sys import maxsize
 
 from . import maze
@@ -60,13 +59,15 @@ class BaseMap:
 class MazeMap(BaseMap):
     WALL = -1
 
-    def __init__(self, n_row, n_col, *, random=None):
+    def __init__(self, n_row, n_col, *, generator=None):
         super().__init__(1 + 2 * n_row, 1 + 2 * n_col)
 
-        self.random_ = random or Random()
-        assert isinstance(self.random_, Random)
+        # re-package the random bit generator from the legacy random state
+        if isinstance(generator, np.random.RandomState):
+            generator = generator._bit_generator
+        self.generator_ = np.random.default_rng(generator)
 
-        walls = maze.generate(n_row, n_col, random=self.random_)
+        walls = maze.generate(n_row, n_col, generator=self.generator_)
         self.map[walls] = self.WALL
 
 
@@ -87,13 +88,15 @@ class RandomDiscoMaze(Env):
     }
 
     def __init__(self, n_row=10, n_col=10, *, n_colors=5, n_targets=1,
-                 field=None, random=None):
+                 field=None, generator=None):
         # super().__init__()
         assert field is None or isinstance(field, tuple)
         self.field = field
 
-        self.random_ = random or Random()
-        assert isinstance(self.random_, Random)
+        # re-package the random bit generator from the legacy random state
+        if isinstance(generator, np.random.RandomState):
+            generator = generator._bit_generator
+        self.generator_ = np.random.default_rng(generator)
 
         from matplotlib.cm import hot
         colors = hot(np.linspace(0.2, 0.8, num=n_colors), bytes=True)
@@ -160,8 +163,11 @@ class RandomDiscoMaze(Env):
 
     def spawn(self, n=1):
         # generate positions
-        *empty, = map(tuple, self.maze.coordinates_of(MazeMap.EMPTY))
-        positions = self.random_.sample(empty, k=n)
+        positions = self.generator_.choice(
+            self.maze.coordinates_of(MazeMap.EMPTY),
+            size=n, replace=False, shuffle=False
+        )
+
         for i, j in positions:
             self.maze[i, j] = len(self.objects)
             self.objects.append((i, j))
@@ -170,10 +176,10 @@ class RandomDiscoMaze(Env):
         return positions
 
     def reset(self):
-        self.maze = MazeMap(self.n_row, self.n_col, random=self.random_)
+        self.maze = MazeMap(self.n_row, self.n_col, generator=self.generator_)
 
         # create the player : `None` represents the empty space
-        i, j = self.random_.choice(self.maze.coordinates_of(MazeMap.EMPTY))
+        i, j = self.generator_.choice(self.maze.coordinates_of(MazeMap.EMPTY))
         self.maze[i, j] = self.PLAYER
         self.objects = [None, (i, j)]
         self.is_alive = True
@@ -190,7 +196,7 @@ class RandomDiscoMaze(Env):
         assert isinstance(maze, BaseMap)
 
         # pick random colors and paint walls with them
-        colors = self.random_.choices(self.COLORS[3:], k=maze.size)
+        colors = self.generator_.choice(self.COLORS[3:], size=maze.size)
         pix = np.array(colors).reshape(*maze.shape, 3)
 
         # assign proper colors to empty space, the player and the targets
@@ -267,10 +273,10 @@ class RandomDiscoMaze(Env):
         return self._viewer.imshow(masked_state)
 
     def seed(self, seed=None):
+        # create an instance of the default prgn and draw a seed from it
         if seed is None:
-            seed = Random().randrange(maxsize)
-
-        self.random_.seed(seed)
+            seed = np.random.default_rng().integers(maxsize)
+        self.generator_ = np.random.default_rng(seed)
         return [seed]
 
     @property

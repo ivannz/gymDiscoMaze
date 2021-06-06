@@ -5,11 +5,11 @@ from ..env import RandomDiscoMaze, BaseMap
 
 
 class RandomDiscoGoal(GoalEnv):
-    def __init__(self, n_row=10, n_col=10, *, n_colors=5, random=None):
+    def __init__(self, n_row=10, n_col=10, *, n_colors=5, generator=None):
         super().__init__()
 
         self.env = RandomDiscoMaze(n_row, n_col, n_targets=0,
-                                   n_colors=n_colors, random=random)
+                                   n_colors=n_colors, generator=generator)
 
         self.action_space = self.env.action_space
         self.observation_space = spaces.Dict(dict.fromkeys([
@@ -52,7 +52,7 @@ class RandomDiscoGoal(GoalEnv):
 
         # generate the goal coordinates and the state
         empty = self.env.maze.coordinates_of(self.env.maze.EMPTY)
-        self.goal = i, j = tuple(self.env.random_.choice(empty))
+        self.goal = i, j = tuple(self.env.generator_.choice(empty))
 
         # create a new map and generate a state for it
         self.goal_maze = BaseMap(*self.env.maze.shape)
