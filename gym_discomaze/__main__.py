@@ -1,37 +1,46 @@
 import time
 import argparse
 
-from pyglet.window import key
+from pyglet.window import key, Window
 
 from . import RandomDiscoMaze
 
-human_agent_action = None
-human_wants_restart = False
-human_sets_pause = False
 
+# global state controlled by kbd handlers, consumed by `rollout`
+class SimpleUIControl:
+    """A bare-bones keyboard event handelr for pyglet UI."""
+    action, pause, restart, waiting = None, False, False, False
 
-def on_key_press(symbol, modifiers):
-    global human_agent_action, human_wants_restart, human_sets_pause
-    if symbol == key.ENTER:
-        human_wants_restart = True
-        return
+    def __init__(self, keymap):
+        self.KEYMAP = keymap
 
-    if symbol == key.SPACE:
-        human_sets_pause = not human_sets_pause
-        return
+    def on_key_press(self, symbol, modifiers):
+        if symbol == key.ENTER:
+            self.restart = True
+            return
 
-    if symbol in KEYMAP:
-        human_agent_action = symbol
-        return
+        if symbol == key.SPACE:
+            self.pause = not self.pause
+            return
 
+        if symbol in self.KEYMAP and not self.waiting:
+            self.action, self.waiting = symbol, True
+            return
 
-def on_key_release(symbol, modifiers):
-    global human_agent_action
+    def on_key_release(self, symbol, modifiers):
+        if symbol in self.KEYMAP and self.waiting:
+            self.action, self.waiting = None, False
+            return
 
-    if symbol in KEYMAP:
-        if human_agent_action == symbol:
-            human_agent_action = None
-        return
+    def register(self, window):
+        assert isinstance(window, Window)
+
+        window.push_handlers(
+            self.on_key_press,
+            self.on_key_release,
+        )
+
+        return self
 
 
 parser = argparse.ArgumentParser(
@@ -73,46 +82,48 @@ env = RandomDiscoMaze(args.n_row, args.n_col,
                       n_colors=args.n_colors,
                       field=(2, 2) if args.partial else None)
 
+env.seed(args.seed)
+
 # print key bindings
 KEYMAP = dict(zip([None, key.A, key.S, key.D, key.W],
                   ['stay', 'west', 'south', 'east', 'north']))
 print({chr(k): n for k, n in KEYMAP.items() if k is not None})
 
-env.seed(args.seed)
+ctrl = SimpleUIControl(KEYMAP)
 
-env.render(mode='human')
-env.unwrapped.viewer.window.push_handlers(on_key_press, on_key_release)
+env.render(mode='human')  # sets up the viewer gui, so that the next line works
+ctrl.register(env.unwrapped.viewer.window)
 
 
-def rollout(env):
-    global human_agent_action, human_wants_restart, human_sets_pause
-
+def rollout(env, ctrl):
     total_reward = 0
-    human_wants_restart, is_terminal = False, False
+    ctrl.restart, is_terminal = False, False
 
     obs = env.reset()
-    while not (human_wants_restart or is_terminal):
-        action = env.named_actions[KEYMAP[human_agent_action]]
-        obs, rew, is_terminal, info = env.step(action)
+    while not (ctrl.restart or is_terminal):
+        act = env.named_actions[KEYMAP[ctrl.action]]
+        ctrl.action = None  # avoid sticky actions
+
+        obs, rew, is_terminal, info = env.step(act)
         if rew != 0:
             print("reward %0.3f" % rew)
 
         if is_terminal:  # pause on termination
-            human_sets_pause = True
+            ctrl.pause = True
 
         total_reward += rew
-        while True:
-            # call render to process kb and ui events
-            if not env.render(mode='human'):
-                return False
-
+        # rendering and ui event loop
+        while env.render(mode='human'):
             time.sleep(0.04)
-            if not human_sets_pause:
+            if not ctrl.pause:
                 break
+
+        else:
+            return False
 
     print("reward %0.2f" % (total_reward))
     return True
 
 
-while rollout(env):
+while rollout(env, ctrl):
     pass
